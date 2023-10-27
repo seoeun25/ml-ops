@@ -1,0 +1,24 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+
+# intelliJ IDEA project files
+.idea/
+*.idea/
+**/.idea/
+
+*.iml
+
+# maven target files
+target/
+**/target/
+
+# Git properties
+**/git.properties
+
+# python
+*/*/__pycache__
+**/__pycache__
+**/__pycache__/**
+**/**/__pycache__
+**/**/__pycache__/**
