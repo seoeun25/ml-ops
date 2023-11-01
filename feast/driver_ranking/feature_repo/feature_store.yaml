@@ -1,0 +1,28 @@
+project: driver_ranking
+# By default, the registry is a file (but can be turned into a more scalable SQL-backed registry)
+# On AWS, minimally you should create a S3 bucket for a remote file registry
+# See https://docs.feast.dev/getting-started/concepts/registry for details
+registry: data/registry.db
+# The provider primarily specifies default offline / online stores & storing the registry in a given cloud
+provider: aws
+# Note: if you comment the online store out, then this by default will use DynamoDB as the online store
+online_store:
+    type: dynamodb
+    region: ap-northeast-2
+# See https://docs.feast.dev/reference/online-stores/dynamodb
+#online_store:
+#    type: dynamodb
+#    region: ap-northeast-2
+# See https://docs.feast.dev/reference/online-stores/redis
+#online_store:
+#   type: redis
+#   connection_string: "localhost:6379"
+offline_store:
+    type: redshift
+    cluster_id: aladin-redshift-cluster
+    region: ap-northeast-2
+    database: dev
+    user: aladin
+    s3_staging_location: s3://aladin-dev-redshift/staging
+    iam_role: arn:aws:iam::671147868155:role/aladin-dev-redshift-role
+entity_key_serialization_version: 2
