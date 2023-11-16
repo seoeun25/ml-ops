@@ -22,3 +22,8 @@ target/
 **/__pycache__/**
 **/**/__pycache__
 **/**/__pycache__/**
+
+# feast db
+feast/driver_ranking_local/feature_repo/data/online_store.db
+feast/driver_ranking_local/feature_repo/feast_ui/yarn.lock
+feast/credit_scoring/feature_repo/data/online_store.db
