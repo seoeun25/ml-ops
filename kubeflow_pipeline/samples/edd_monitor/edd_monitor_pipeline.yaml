@@ -1,0 +1,487 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: edd-monitor-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2024-03-13T02:22:52.546026',
+                pipelines.kubeflow.org/pipeline_spec: '{"description": "EDD data loading monitor",
+      "inputs": [{"name": "cur_date", "type": "String"}, {"name": "debug", "type":
+      "Boolean"}, {"name": "args", "type": "String"}], "name": "edd_monitor_pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
+spec:
+  entrypoint: edd-monitor-pipeline
+  templates:
+    - name: apollo
+      container:
+        args: [--cur-date, '{{inputs.parameters.cur_date}}', --debug, '{{inputs.parameters.debug}}',
+               --args, '{{inputs.parameters.args}}', '----output-paths', /tmp/outputs/Output/data]
+        command:
+          - sh
+          - -ec
+          - |
+            program_path=$(mktemp)
+            printf "%s" "$0" > "$program_path"
+            python3 -u "$program_path" "$@"
+          - |
+            def apollo(cur_date, debug, args):
+                import pandas as pd
+                from datetime import datetime, timedelta
+                if cur_date is None or cur_date == "":
+                    cur_date = datetime.today().strftime("%Y%m%d")
+                print("cur_date = {}, debug={}, args = {}".format(cur_date, debug, args))
+            
+                schema_name = "apollo"
+            
+                def log_error(schema_name, query, error):
+                    print("[{}], error={}, query={}".format(schema_name, error, query))
+            
+                def check_last_data(last_date, cur_date, days):
+                    if debug:
+                        return
+                    if last_date < date_add(cur_date, days).strftime("%Y%m%d"):
+                        raise Exception("cur_date = {}, last_date = {}. expected last_date = {} ".format(cur_date, last_date, date_add(cur_date, days).strftime("%Y%m%d")))
+                def date_add(cur_date, days):
+                    """
+                    Convert date string to datetime.
+                    ex> date_deleta("20231020" -2): datetime object (2023-10-18 00:00:00)
+                    :param cur_date: cur_date in %Y%m%d format
+                    :param days: delta days. plus or minus days
+                    :return: datetime
+                    """
+                    return datetime.strptime(cur_date, "%Y%m%d") + timedelta(days=days)
+            
+                def fetchmany(query, size, column_name):
+                    """
+                    Fetch data.
+            
+                    Parameters
+                    ----------
+                    query: string. SQL.
+                    size: int. fetch rows
+                    column_name: list. fetch columns
+            
+                    Returns
+                    -------
+                    object: first row, first column data
+                    """
+                    print("----------------------")
+                    print(query)
+                    cursor.execute(query)
+                    df = pd.DataFrame(cursor.fetchmany(size=size), columns=column_name)
+                    print("rows =", len(df))
+                    print("columns = ", df.columns)
+                    min_row = len(df)
+            
+                    for i in range(min_row):
+                        projection = []
+                        for j in range(len(column_name)):
+                            projection.append(df.loc[i][column_name[j]])
+                            if i == 0 and j == 0:
+                                result = df.loc[i][column_name[j]]
+                        print(projection)
+            
+                    return result
+            
+                catalog_name = "edd_hive"
+                def apollo_helper(cur_date, args):
+                    table_name = "luna_user"
+                    query = f"SELECT count(*) as cnt FROM {catalog_name}.{schema_name}.{table_name} t "
+                    r1 = fetchmany(query, 5, ["cnt"])
+            
+                    table_name = "luna_id_apollo_sub"
+                    query = f"SELECT dt as p_dt FROM {catalog_name}.{schema_name}.\"{table_name}$partitions\" order by dt desc"
+                    r2 = fetchmany(query, 5, ["p_dt"])
+                    check_last_data(r2, cur_date, -2)
+            
+                    table_name = "luna_comm_log"
+                    query = f"SELECT dt as p_dt FROM {catalog_name}.{schema_name}.\"{table_name}$partitions\" order by dt desc"
+                    r3 = fetchmany(query, 5, ["p_dt"])
+                    check_last_data(r3, cur_date, -2)
+            
+                    table_name = "user_context_log"
+                    query = f"SELECT dt as p_dt, hh as p_hh FROM {catalog_name}.{schema_name}.\"{table_name}$partitions\" order by dt desc, hh desc"
+                    r4 = fetchmany(query, 5, ["p_dt", "p_hh"])
+                    check_last_data(r4, cur_date, -2)
+            
+                from aladin import trino
+                conn = trino.connect(catalog=catalog_name, schema=schema_name)
+                cursor = conn.cursor()
+                try:
+                    apollo_helper(cur_date, args)
+                except Exception as error:
+                    print("-- Exception --", error)
+                    raise
+            
+                # Close trino connection
+                conn.close()
+                print("Finish {}".format(schema_name))
+                return "ok"
+            
+            def _deserialize_bool(s) -> bool:
+                from distutils.util import strtobool
+                return strtobool(s) == 1
+            
+            def _serialize_str(str_value: str) -> str:
+                if not isinstance(str_value, str):
+                    raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                        str(str_value), str(type(str_value))))
+                return str_value
+            
+            import argparse
+            _parser = argparse.ArgumentParser(prog='Apollo', description='')
+            _parser.add_argument("--cur-date", dest="cur_date", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--debug", dest="debug", type=_deserialize_bool, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--args", dest="args", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
+            _parsed_args = vars(_parser.parse_args())
+            _output_files = _parsed_args.pop("_output_paths", [])
+            
+            _outputs = apollo(**_parsed_args)
+            
+            _outputs = [_outputs]
+            
+            _output_serializers = [
+                _serialize_str,
+            
+            ]
+            
+            import os
+            for idx, output_file in enumerate(_output_files):
+                try:
+                    os.makedirs(os.path.dirname(output_file))
+                except OSError:
+                    pass
+                with open(output_file, 'w') as f:
+                    f.write(_output_serializers[idx](_outputs[idx]))
+        image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:anaconda-cpu
+        volumeMounts:
+          - {mountPath: /data, name: data-pvc}
+      inputs:
+        parameters:
+          - {name: args}
+          - {name: cur_date}
+          - {name: data-pvc-name}
+          - {name: debug}
+      outputs:
+        parameters:
+          - name: apollo-Output
+            valueFrom: {path: /tmp/outputs/Output/data}
+        artifacts:
+          - {name: apollo-Output, path: /tmp/outputs/Output/data}
+      metadata:
+        labels:
+          pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+          pipelines.kubeflow.org/pipeline-sdk-type: kfp
+          pipelines.kubeflow.org/enable_caching: "true"
+        annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--cur-date", {"inputValue": "cur_date"}, "--debug", {"inputValue":
+          "debug"}, "--args", {"inputValue": "args"}, "----output-paths", {"outputPath":
+          "Output"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
+          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
+          apollo(cur_date, debug, args):\n    import pandas as pd\n    from datetime
+          import datetime, timedelta\n    if cur_date is None or cur_date == \"\":\n        cur_date
+          = datetime.today().strftime(\"%Y%m%d\")\n    print(\"cur_date = {}, debug={},
+          args = {}\".format(cur_date, debug, args))\n\n    schema_name = \"apollo\"\n\n    def
+          log_error(schema_name, query, error):\n        print(\"[{}], error={}, query={}\".format(schema_name,
+          error, query))\n\n    def check_last_data(last_date, cur_date, days):\n        if
+          debug:\n            return\n        if last_date < date_add(cur_date, days).strftime(\"%Y%m%d\"):\n            raise
+          Exception(\"cur_date = {}, last_date = {}. expected last_date = {} \".format(cur_date,
+          last_date, date_add(cur_date, days).strftime(\"%Y%m%d\")))\n    def date_add(cur_date,
+          days):\n        \"\"\"\n        Convert date string to datetime.\n        ex>
+          date_deleta(\"20231020\" -2): datetime object (2023-10-18 00:00:00)\n        :param
+          cur_date: cur_date in %Y%m%d format\n        :param days: delta days. plus
+          or minus days\n        :return: datetime\n        \"\"\"\n        return
+          datetime.strptime(cur_date, \"%Y%m%d\") + timedelta(days=days)\n\n    def
+          fetchmany(query, size, column_name):\n        \"\"\"\n        Fetch data.\n\n        Parameters\n        ----------\n        query:
+          string. SQL.\n        size: int. fetch rows\n        column_name: list.
+          fetch columns\n\n        Returns\n        -------\n        object: first
+          row, first column data\n        \"\"\"\n        print(\"----------------------\")\n        print(query)\n        cursor.execute(query)\n        df
+          = pd.DataFrame(cursor.fetchmany(size=size), columns=column_name)\n        print(\"rows
+          =\", len(df))\n        print(\"columns = \", df.columns)\n        min_row
+          = len(df)\n\n        for i in range(min_row):\n            projection =
+          []\n            for j in range(len(column_name)):\n                projection.append(df.loc[i][column_name[j]])\n                if
+          i == 0 and j == 0:\n                    result = df.loc[i][column_name[j]]\n            print(projection)\n\n        return
+          result\n\n    catalog_name = \"edd_hive\"\n    def apollo_helper(cur_date,
+          args):\n        table_name = \"luna_user\"\n        query = f\"SELECT count(*)
+          as cnt FROM {catalog_name}.{schema_name}.{table_name} t \"\n        r1 =
+          fetchmany(query, 5, [\"cnt\"])\n\n        table_name = \"luna_id_apollo_sub\"\n        query
+          = f\"SELECT dt as p_dt FROM {catalog_name}.{schema_name}.\\\"{table_name}$partitions\\\"
+          order by dt desc\"\n        r2 = fetchmany(query, 5, [\"p_dt\"])\n        check_last_data(r2,
+          cur_date, -2)\n\n        table_name = \"luna_comm_log\"\n        query =
+          f\"SELECT dt as p_dt FROM {catalog_name}.{schema_name}.\\\"{table_name}$partitions\\\"
+          order by dt desc\"\n        r3 = fetchmany(query, 5, [\"p_dt\"])\n        check_last_data(r3,
+          cur_date, -2)\n\n        table_name = \"user_context_log\"\n        query
+          = f\"SELECT dt as p_dt, hh as p_hh FROM {catalog_name}.{schema_name}.\\\"{table_name}$partitions\\\"
+          order by dt desc, hh desc\"\n        r4 = fetchmany(query, 5, [\"p_dt\",
+          \"p_hh\"])\n        check_last_data(r4, cur_date, -2)\n\n    from aladin
+          import trino\n    conn = trino.connect(catalog=catalog_name, schema=schema_name)\n    cursor
+          = conn.cursor()\n    try:\n        apollo_helper(cur_date, args)\n    except
+          Exception as error:\n        print(\"-- Exception --\", error)\n        raise\n\n    #
+          Close trino connection\n    conn.close()\n    print(\"Finish {}\".format(schema_name))\n    return
+          \"ok\"\n\ndef _deserialize_bool(s) -> bool:\n    from distutils.util import
+          strtobool\n    return strtobool(s) == 1\n\ndef _serialize_str(str_value:
+          str) -> str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Apollo'', description='''')\n_parser.add_argument(\"--cur-date\",
+          dest=\"cur_date\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--debug\",
+          dest=\"debug\", type=_deserialize_bool, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--args\",
+          dest=\"args\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = apollo(**_parsed_args)\n\n_outputs
+          = [_outputs]\n\n_output_serializers = [\n    _serialize_str,\n\n]\n\nimport
+          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:anaconda-cpu"}},
+          "inputs": [{"name": "cur_date", "type": "String"}, {"name": "debug", "type":
+          "Boolean"}, {"name": "args", "type": "String"}], "name": "Apollo", "outputs":
+          [{"name": "Output", "type": "String"}]}', pipelines.kubeflow.org/component_ref: '{}',
+                      pipelines.kubeflow.org/arguments.parameters: '{"args": "{{inputs.parameters.args}}",
+          "cur_date": "{{inputs.parameters.cur_date}}", "debug": "{{inputs.parameters.debug}}"}'}
+      volumes:
+        - name: data-pvc
+          persistentVolumeClaim: {claimName: '{{inputs.parameters.data-pvc-name}}'}
+    - name: cpm
+      container:
+        args: [--previous, '{{inputs.parameters.apollo-Output}}', --cur-date, '{{inputs.parameters.cur_date}}',
+               --debug, '{{inputs.parameters.debug}}', --args, '{{inputs.parameters.args}}',
+               '----output-paths', /tmp/outputs/Output/data]
+        command:
+          - sh
+          - -ec
+          - |
+            program_path=$(mktemp)
+            printf "%s" "$0" > "$program_path"
+            python3 -u "$program_path" "$@"
+          - |
+            def cpm(previous, cur_date, debug, args):
+                import pandas as pd
+                from datetime import datetime, timedelta
+                if cur_date is None or cur_date == "":
+                    cur_date = datetime.today().strftime("%Y%m%d")
+                print("previous={}, cur_date = {}, debug={}, args = {}".format(previous, cur_date, debug, args))
+            
+                schema_name = "cpm"
+                def log_error(schema_name, query, error):
+                    print("[{}], error={}, query={}".format(schema_name, error, query))
+            
+                def check_last_data(last_date, cur_date, days):
+                    if debug:
+                        return
+                    if last_date < date_add(cur_date, days).strftime("%Y%m%d"):
+                        raise Exception("cur_date = {}, last_date = {}. expected last_date = {} ".format(cur_date, last_date, date_add(cur_date, days).strftime("%Y%m%d")))
+                def date_add(cur_date, days):
+                    return datetime.strptime(cur_date, "%Y%m%d") + timedelta(days=days)
+            
+                def fetchmany(query, size, column_name):
+                    print("----------------------")
+                    print(query)
+                    cursor.execute(query)
+                    df = pd.DataFrame(cursor.fetchmany(size=size), columns=column_name)
+                    print("rows =", len(df))
+                    print("columns = ", df.columns)
+                    min_row = len(df)
+            
+                    for i in range(min_row):
+                        projection = []
+                        for j in range(len(column_name)):
+                            projection.append(df.loc[i][column_name[j]])
+                            if i == 0 and j == 0:
+                                result = df.loc[i][column_name[j]]
+                        print(projection)
+            
+                    return result
+            
+                catalog_name = "edd_hive"
+                def cpm_helper(cur_date, args):
+                    table_name = "life_locationfeature_monthly"
+                    query = f"SELECT ym as p_ym FROM {catalog_name}.{schema_name}.\"{table_name}$partitions\" order by ym desc"
+                    r1 = fetchmany(query=query, size=5, column_name=["p_ym"])
+                    check_last_data(r1, cur_date, -60)
+            
+                    table_name = "life_visit_poi_monthly"
+                    query = f"SELECT ym as p_ym FROM {catalog_name}.{schema_name}.\"{table_name}$partitions\" order by ym desc"
+                    r2 = fetchmany(query=query, size=5, column_name=["p_ym"])
+                    check_last_data(r2, cur_date, -60)
+            
+                from aladin import trino
+                conn = trino.connect(catalog=catalog_name, schema=schema_name)
+                cursor = conn.cursor()
+                try:
+                    cpm_helper(cur_date, args)
+                except Exception as error:
+                    print("-- Exception --", error)
+                    raise
+            
+                # Close trino connection
+                conn.close()
+                print("Finish {}".format(schema_name))
+                return "ok"
+            
+            def _deserialize_bool(s) -> bool:
+                from distutils.util import strtobool
+                return strtobool(s) == 1
+            
+            def _serialize_str(str_value: str) -> str:
+                if not isinstance(str_value, str):
+                    raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                        str(str_value), str(type(str_value))))
+                return str_value
+            
+            import argparse
+            _parser = argparse.ArgumentParser(prog='Cpm', description='')
+            _parser.add_argument("--previous", dest="previous", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--cur-date", dest="cur_date", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--debug", dest="debug", type=_deserialize_bool, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--args", dest="args", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
+            _parsed_args = vars(_parser.parse_args())
+            _output_files = _parsed_args.pop("_output_paths", [])
+            
+            _outputs = cpm(**_parsed_args)
+            
+            _outputs = [_outputs]
+            
+            _output_serializers = [
+                _serialize_str,
+            
+            ]
+            
+            import os
+            for idx, output_file in enumerate(_output_files):
+                try:
+                    os.makedirs(os.path.dirname(output_file))
+                except OSError:
+                    pass
+                with open(output_file, 'w') as f:
+                    f.write(_output_serializers[idx](_outputs[idx]))
+        image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:anaconda-cpu
+      inputs:
+        parameters:
+          - {name: apollo-Output}
+          - {name: args}
+          - {name: cur_date}
+          - {name: debug}
+      outputs:
+        artifacts:
+          - {name: cpm-Output, path: /tmp/outputs/Output/data}
+      metadata:
+        labels:
+          pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+          pipelines.kubeflow.org/pipeline-sdk-type: kfp
+          pipelines.kubeflow.org/enable_caching: "true"
+        annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--previous", {"inputValue": "previous"}, "--cur-date", {"inputValue":
+          "cur_date"}, "--debug", {"inputValue": "debug"}, "--args", {"inputValue":
+          "args"}, "----output-paths", {"outputPath": "Output"}], "command": ["sh",
+          "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def cpm(previous, cur_date, debug, args):\n    import
+          pandas as pd\n    from datetime import datetime, timedelta\n    if cur_date
+          is None or cur_date == \"\":\n        cur_date = datetime.today().strftime(\"%Y%m%d\")\n    print(\"previous={},
+          cur_date = {}, debug={}, args = {}\".format(previous, cur_date, debug, args))\n\n    schema_name
+          = \"cpm\"\n    def log_error(schema_name, query, error):\n        print(\"[{}],
+          error={}, query={}\".format(schema_name, error, query))\n\n    def check_last_data(last_date,
+          cur_date, days):\n        if debug:\n            return\n        if last_date
+          < date_add(cur_date, days).strftime(\"%Y%m%d\"):\n            raise Exception(\"cur_date
+          = {}, last_date = {}. expected last_date = {} \".format(cur_date, last_date,
+          date_add(cur_date, days).strftime(\"%Y%m%d\")))\n    def date_add(cur_date,
+          days):\n        return datetime.strptime(cur_date, \"%Y%m%d\") + timedelta(days=days)\n\n    def
+          fetchmany(query, size, column_name):\n        print(\"----------------------\")\n        print(query)\n        cursor.execute(query)\n        df
+          = pd.DataFrame(cursor.fetchmany(size=size), columns=column_name)\n        print(\"rows
+          =\", len(df))\n        print(\"columns = \", df.columns)\n        min_row
+          = len(df)\n\n        for i in range(min_row):\n            projection =
+          []\n            for j in range(len(column_name)):\n                projection.append(df.loc[i][column_name[j]])\n                if
+          i == 0 and j == 0:\n                    result = df.loc[i][column_name[j]]\n            print(projection)\n\n        return
+          result\n\n    catalog_name = \"edd_hive\"\n    def cpm_helper(cur_date,
+          args):\n        table_name = \"life_locationfeature_monthly\"\n        query
+          = f\"SELECT ym as p_ym FROM {catalog_name}.{schema_name}.\\\"{table_name}$partitions\\\"
+          order by ym desc\"\n        r1 = fetchmany(query=query, size=5, column_name=[\"p_ym\"])\n        check_last_data(r1,
+          cur_date, -60)\n\n        table_name = \"life_visit_poi_monthly\"\n        query
+          = f\"SELECT ym as p_ym FROM {catalog_name}.{schema_name}.\\\"{table_name}$partitions\\\"
+          order by ym desc\"\n        r2 = fetchmany(query=query, size=5, column_name=[\"p_ym\"])\n        check_last_data(r2,
+          cur_date, -60)\n\n    from aladin import trino\n    conn = trino.connect(catalog=catalog_name,
+          schema=schema_name)\n    cursor = conn.cursor()\n    try:\n        cpm_helper(cur_date,
+          args)\n    except Exception as error:\n        print(\"-- Exception --\",
+          error)\n        raise\n\n    # Close trino connection\n    conn.close()\n    print(\"Finish
+          {}\".format(schema_name))\n    return \"ok\"\n\ndef _deserialize_bool(s)
+          -> bool:\n    from distutils.util import strtobool\n    return strtobool(s)
+          == 1\n\ndef _serialize_str(str_value: str) -> str:\n    if not isinstance(str_value,
+          str):\n        raise TypeError(''Value \"{}\" has type \"{}\" instead of
+          str.''.format(\n            str(str_value), str(type(str_value))))\n    return
+          str_value\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Cpm'',
+          description='''')\n_parser.add_argument(\"--previous\", dest=\"previous\",
+          type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--cur-date\",
+          dest=\"cur_date\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--debug\",
+          dest=\"debug\", type=_deserialize_bool, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--args\",
+          dest=\"args\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = cpm(**_parsed_args)\n\n_outputs
+          = [_outputs]\n\n_output_serializers = [\n    _serialize_str,\n\n]\n\nimport
+          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:anaconda-cpu"}},
+          "inputs": [{"name": "previous", "type": "String"}, {"name": "cur_date",
+          "type": "String"}, {"name": "debug", "type": "Boolean"}, {"name": "args",
+          "type": "String"}], "name": "Cpm", "outputs": [{"name": "Output", "type":
+          "String"}]}', pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"args":
+          "{{inputs.parameters.args}}", "cur_date": "{{inputs.parameters.cur_date}}",
+          "debug": "{{inputs.parameters.debug}}", "previous": "{{inputs.parameters.apollo-Output}}"}'}
+    - name: data-pvc
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: data-volume
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+      outputs:
+        parameters:
+          - name: data-pvc-manifest
+            valueFrom: {jsonPath: '{}'}
+          - name: data-pvc-name
+            valueFrom: {jsonPath: '{.metadata.name}'}
+          - name: data-pvc-size
+            valueFrom: {jsonPath: '{.status.capacity.storage}'}
+      metadata:
+        labels:
+          pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+          pipelines.kubeflow.org/pipeline-sdk-type: kfp
+          pipelines.kubeflow.org/enable_caching: "true"
+    - name: edd-monitor-pipeline
+      inputs:
+        parameters:
+          - {name: args}
+          - {name: cur_date}
+          - {name: debug}
+      dag:
+        tasks:
+          - name: apollo
+            template: apollo
+            dependencies: [data-pvc]
+            arguments:
+              parameters:
+                - {name: args, value: '{{inputs.parameters.args}}'}
+                - {name: cur_date, value: '{{inputs.parameters.cur_date}}'}
+                - {name: data-pvc-name, value: '{{tasks.data-pvc.outputs.parameters.data-pvc-name}}'}
+                - {name: debug, value: '{{inputs.parameters.debug}}'}
+          - name: cpm
+            template: cpm
+            dependencies: [apollo]
+            arguments:
+              parameters:
+                - {name: apollo-Output, value: '{{tasks.apollo.outputs.parameters.apollo-Output}}'}
+                - {name: args, value: '{{inputs.parameters.args}}'}
+                - {name: cur_date, value: '{{inputs.parameters.cur_date}}'}
+                - {name: debug, value: '{{inputs.parameters.debug}}'}
+          - {name: data-pvc, template: data-pvc}
+  arguments:
+    parameters:
+      - {name: cur_date}
+      - {name: debug}
+      - {name: args}
+  serviceAccountName: pipeline-runner
