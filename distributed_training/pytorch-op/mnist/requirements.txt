@@ -1,0 +1,5 @@
+pyyaml
+kubernetes
+kubeflow-training
+kubeflow-pytorchjob
+retrying
