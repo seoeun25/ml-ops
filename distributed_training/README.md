@@ -47,7 +47,13 @@ $ kubectl delete pytorchjob pytorch-mnist-1381df7d-a04b-4947-bfcf-746774cdf612 -
 #### kubernetes yaml로 실행
 https://v1-7-branch.kubeflow.org/docs/components/training/pytorch/
 
+pytorch job quickstart
 ```
 kubectl create -f distribued_training/simple.yaml
+```
+
+aladin image with aladin training python script
+```
+kubectl create -f aladin-mnist-pytorchjob.yaml
 ```
 
