@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
-
+RANK = int(os.environ["RANK"])
 
 class Net(nn.Module):
     def __init__(self):
@@ -111,9 +111,25 @@ def main():
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
+    print("WORLD_SIZE={}".format(WORLD_SIZE))
+    print(f"torch.__version__: {torch.__version__}")
+    print("dist.is_available: {}".format(dist.is_available()))
+    print("torch.cuda.is_available: {}".format(torch.cuda.is_available()))
+    print("should_distribute: {}".format(should_distribute()))
+    print(f"device: {device}")
+
+    RANK = int(os.environ["RANK"])
+    print("RANK", RANK)
+    LOCAL_RANK = int(os.environ["LOCAL_RANK"])
+    print("LOCAL_RANK", LOCAL_RANK)
+
     if should_distribute():
         print('Using distributed PyTorch with {} backend'.format(args.backend))
-        dist.init_process_group(backend=args.backend)
+        torch.cuda.set_device(RANK)
+        dist.init_process_group(backend=args.backend, rank=RANK, world_size=WORLD_SIZE)
+
+    print("is_distributed: {}".format(is_distributed()))
+    print(f"dist.get_rank()={dist.get_rank()}")
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
@@ -133,6 +149,7 @@ def main():
     model = Net().to(device)
 
     if is_distributed():
+        print("Using Distributor - nn.parallel.DistributedDataParallel")
         Distributor = nn.parallel.DistributedDataParallel if use_cuda \
             else nn.parallel.DistributedDataParallelCPU
         model = Distributor(model)

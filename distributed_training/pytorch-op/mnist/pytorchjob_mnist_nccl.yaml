@@ -1,0 +1,85 @@
+apiVersion: "kubeflow.org/v1"
+kind: "PyTorchJob"
+metadata:
+  name: "pytorch-mnist-nccl"
+  namespace: seoeun
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+            - name: pytorch
+              image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              args: ["--backend", "nccl"]
+              command:
+                - sh
+                - -ec
+                - python3 -m pip install --user --no-warn-script-location tensorboardX && $0 $@
+                - python
+                - /efs-data/mnist.py
+                - --batch-size 16
+                - --epochs 10
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /efs-data
+                  name: efs-data
+          tolerations:
+            - effect: NoSchedule
+              key: gpu.aladin.skt/type
+              operator: Equal
+              value: a10g
+            - effect: NoSchedule
+              key: cpu.aladin.skt/type
+              operator: Equal
+              value: common
+          volumes:
+            - name: efs-data
+              persistentVolumeClaim:
+                claimName: efs-data
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+            - name: pytorch
+              image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              args: ["--backend", "nccl"]
+              command:
+                - sh
+                - -ec
+                - python3 -m pip install --user --no-warn-script-location tensorboardX && $0 $@
+                - python
+                - /efs-data/mnist.py
+                - --batch-size 16
+                - --epochs 10
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /efs-data
+                  name: efs-data
+          tolerations:
+            - effect: NoSchedule
+              key: gpu.aladin.skt/type
+              operator: Equal
+              value: a10g
+            - effect: NoSchedule
+              key: cpu.aladin.skt/type
+              operator: Equal
+              value: common
+          volumes:
+            - name: efs-data
+              persistentVolumeClaim:
+                claimName: efs-data

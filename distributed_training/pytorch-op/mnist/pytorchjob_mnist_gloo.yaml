@@ -1,7 +1,7 @@
 apiVersion: kubeflow.org/v1
 kind: PyTorchJob
 metadata:
-  name: pytorch-mnist-ex
+  name: pytorch-mnist-gloo
   namespace: seoeun
 spec:
   pytorchReplicaSpecs:
@@ -27,7 +27,7 @@ spec:
                   "$0" "$@"
                 - python
                 - /efs-data/mnist.py
-              image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              image: 974643886555.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
               name: pytorch
               volumeMounts:
                 - mountPath: /efs-data
@@ -37,7 +37,7 @@ spec:
               persistentVolumeClaim:
                 claimName: efs-data
     Worker:
-      replicas: 2
+      replicas: 1
       restartPolicy: OnFailure
       template:
         metadata:
@@ -54,7 +54,7 @@ spec:
                 - python3 -m pip install --user --no-warn-script-location tensorboardX && $0 $@
                 - python
                 - /efs-data/mnist.py
-              image: 671147868155.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              image: 974643886555.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
               name: pytorch
               volumeMounts:
                 - mountPath: /efs-data
