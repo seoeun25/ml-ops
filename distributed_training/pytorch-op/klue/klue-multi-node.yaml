@@ -1,0 +1,111 @@
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: pytorch-klue-multi-node
+  namespace: seoeun
+spec:
+  elasticPolicy:
+    nProcPerNode: 1
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+            - args:
+                - --backend
+                - nccl
+              command:
+                - python
+                - -m
+                - torch.distributed.run
+                - /efs-data/klue_ynat_2_finetune_4_13b-chat.py
+                - -- use_reentrant True
+                - -- gradient_checkpointing False
+              image: 974643886555.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              name: pytorch
+              resources:
+                requests:
+                  cpu: 7
+                  memory: 40Gi
+                  nvidia.com/gpu: 1
+                limits:
+                  cpu: 7
+                  memory: 40Gi
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /efs-data
+                  name: efs-data
+                - mountPath: /home/jovyan
+                  name: bacillus-shared-sllm
+          tolerations:
+            - effect: NoSchedule
+              key: gpu.aladin.skt/type
+              operator: Equal
+              value: a10g
+            - effect: NoSchedule
+              key: cpu.aladin.skt/type
+              operator: Equal
+              value: common
+          volumes:
+            - name: efs-data
+              persistentVolumeClaim:
+                claimName: efs-data
+            - name: bacillus-shared-sllm
+              persistentVolumeClaim:
+                claimName: bacillus-shared-sllm
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+            - args:
+                - --backend
+                - nccl
+              command:
+                - python
+                - -m
+                - torch.distributed.run
+                - /efs-data/klue_ynat_2_finetune_4_13b-chat.py
+                - -- use_reentrant True
+                - -- gradient_checkpointing False
+              image: 974643886555.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              name: pytorch
+              resources:
+                requests:
+                  cpu: 7
+                  memory: 40Gi
+                  nvidia.com/gpu: 1
+                limits:
+                  cpu: 7
+                  memory: 40Gi
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /efs-data
+                  name: efs-data
+                - mountPath: /home/jovyan
+                  name: bacillus-shared-sllm
+          tolerations:
+            - effect: NoSchedule
+              key: gpu.aladin.skt/type
+              operator: Equal
+              value: a10g
+            - effect: NoSchedule
+              key: cpu.aladin.skt/type
+              operator: Equal
+              value: common
+          volumes:
+            - name: efs-data
+              persistentVolumeClaim:
+                claimName: efs-data
+            - name: bacillus-shared-sllm
+              persistentVolumeClaim:
+                claimName: bacillus-shared-sllm
