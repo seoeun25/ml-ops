@@ -3,3 +3,5 @@ kubernetes
 kubeflow-training
 kubeflow-pytorchjob
 retrying
+torchvision
+torch

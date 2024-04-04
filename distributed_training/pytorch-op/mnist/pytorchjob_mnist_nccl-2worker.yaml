@@ -1,14 +1,14 @@
 apiVersion: "kubeflow.org/v1"
 kind: "PyTorchJob"
 metadata:
-  name: "pytorch-mnist-nccl-2gpu"
+  name: "pytorch-mnist-nccl-2worker"
   namespace: seoeun
 spec:
   elasticPolicy:
-    nProcPerNode: 2
+    nProcPerNode: 1
   pytorchReplicaSpecs:
     Worker:
-      replicas: 1
+      replicas: 2
       restartPolicy: OnFailure
       template:
         metadata:
@@ -23,15 +23,13 @@ spec:
                 - sh
                 - -ec
                 - python3 -m pip install --user --no-warn-script-location tensorboardX && $0 $@
-                - python
-                - -m
-                - torch.distributed.run
+                - torchrun
                 - /efs-data/mnist.py
                 - --batch-size 16
                 - --epochs 5
               resources:
                 limits:
-                  nvidia.com/gpu: 2
+                  nvidia.com/gpu: 1
               volumeMounts:
                 - mountPath: /efs-data
                   name: efs-data

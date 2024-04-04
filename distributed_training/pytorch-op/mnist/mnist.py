@@ -2,9 +2,11 @@ from __future__ import print_function
 
 import argparse
 import os
+import sys
 
 from tensorboardX import SummaryWriter
 from torchvision import datasets, transforms
+import torchvision
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -112,24 +114,41 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
 
     print("WORLD_SIZE={}".format(WORLD_SIZE))
+    print("Python version:", sys.version)
+    print("Python version info:", sys.version_info)
     print(f"torch.__version__: {torch.__version__}")
+    print("torchvision version:", torchvision.__version__)
+    print(f"torch.version.cuda: {torch.version.cuda}")
+    print("WORLD_SIZE={}".format(WORLD_SIZE))
     print("dist.is_available: {}".format(dist.is_available()))
     print("torch.cuda.is_available: {}".format(torch.cuda.is_available()))
     print("should_distribute: {}".format(should_distribute()))
     print(f"device: {device}")
 
-    RANK = int(os.environ["RANK"])
-    print("RANK", RANK)
-    LOCAL_RANK = int(os.environ["LOCAL_RANK"])
-    print("LOCAL_RANK", LOCAL_RANK)
+    try:
+        RANK = int(os.environ["RANK"])
+        print("RANK::", RANK)
+    except Exception as e:
+        print(e)
+    try:
+        LOCAL_RANK = int(os.environ["LOCAL_RANK"])
+        print("LOCAL_RANK::", LOCAL_RANK)
+    except Exception as e:
+        print(e)
 
     if should_distribute():
         print('Using distributed PyTorch with {} backend'.format(args.backend))
-        torch.cuda.set_device(RANK)
+        # for multi-gpu.
+        #torch.cuda.set_device(RANK)
         dist.init_process_group(backend=args.backend, rank=RANK, world_size=WORLD_SIZE)
 
     print("is_distributed: {}".format(is_distributed()))
     print(f"dist.get_rank()={dist.get_rank()}")
+
+    from accelerate import Accelerator
+    device_index = Accelerator().process_index
+    device_map = {"": device_index}
+    #print("device_map", device_map)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
