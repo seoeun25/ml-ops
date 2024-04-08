@@ -1,0 +1,14 @@
+PEFT version: 0.10.0
+Using CUDA
+Python version: 3.10.11 (main, Apr 20 2023, 19:02:41) [GCC 11.2.0]
+Python version info: sys.version_info(major=3, minor=10, micro=11, releaselevel='final', serial=0)
+torch.__version__: 2.0.1
+torch.version.cuda: 11.7
+WORLD_SIZE=2
+device: cuda
+RANK:: 0
+LOCAL_RANK:: 0
+Traceback (most recent call last):
+  File "/efs-data/klue_ynat_2_finetune_4_13b-chat.py", line 45, in <module>
+    from peft import (
+ImportError: cannot import name 'prepare_model_for_int8_training' from 'peft' (/opt/conda/lib/python3.10/site-packages/peft/__init__.py)

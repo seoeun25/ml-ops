@@ -1,0 +1,51 @@
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: pytorch-klue-2-worker
+  namespace: seoeun
+spec:
+  elasticPolicy:
+    nProcPerNode: 1
+  pytorchReplicaSpecs:
+    Worker:
+      replicas: 2
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+            - args:
+                - --backend
+                - nccl
+              command:
+                - torchrun
+                - /efs-data/klue_ynat_2_finetune_4_13b-chat.py
+                - CUDA_LAUNCH_BLOCKING=1
+              image: 974643886555.dkr.ecr.ap-northeast-2.amazonaws.com/aladin-runtime:pytorch-llama
+              name: pytorch
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /efs-data
+                  name: efs-data
+                - mountPath: /home/jovyan
+                  name: bacillus-shared-sllm
+          tolerations:
+            - effect: NoSchedule
+              key: gpu.aladin.skt/type
+              operator: Equal
+              value: a10g
+            - effect: NoSchedule
+              key: cpu.aladin.skt/type
+              operator: Equal
+              value: common
+          volumes:
+            - name: efs-data
+              persistentVolumeClaim:
+                claimName: efs-data
+            - name: bacillus-shared-sllm
+              persistentVolumeClaim:
+                claimName: bacillus-shared-sllm

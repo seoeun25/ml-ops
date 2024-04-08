@@ -6,6 +6,7 @@
 
 import numpy as np
 import os
+import sys
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -13,13 +14,39 @@ from tqdm import tqdm
 from contextlib import nullcontext
 from datasets import load_dataset, load_from_disk, Dataset
 
+os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
+import peft
+print(f"fPEFT version:{peft.__version__}")
+use_cuda = torch.cuda.is_available()
+if use_cuda:
+    print('Using CUDA')
+WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
+device = torch.device("cuda" if use_cuda else "cpu")
+print(f"Python version:{sys.version}")
+#print("Python version info:", sys.version_info)
+print(f"torch.__version__: {torch.__version__}")
+print(f"torch.version.cuda: {torch.version.cuda}")
+print("WORLD_SIZE={}".format(WORLD_SIZE))
+print(f"device: {device}")
+
+try:
+    RANK = int(os.environ["RANK"])
+    print(f"RANK::{RANK}")
+except Exception as e:
+    print(e)
+try:
+    LOCAL_RANK = int(os.environ["LOCAL_RANK"])
+    print(f"LOCAL_RANK::{LOCAL_RANK}")
+except Exception as e:
+    print(e)
+
+
 from peft import (
     get_peft_config, 
     PeftModel, 
     PeftConfig, 
     get_peft_model, 
     LoraConfig, 
-    prepare_model_for_int8_training,
     prepare_model_for_kbit_training,
     TaskType
 )
@@ -89,9 +116,20 @@ tokenizer.pad_token = tokenizer.eos_token
 
 from accelerate import Accelerator
 device_index = Accelerator().process_index
-device_map = {"": device_index}
+print(f"accelerator.device_index={device_index}")
+# device_map = {"": device_index}
+# print("device_map: ", device_map)
+print("device_count: ", torch.cuda.device_count())
+print("current_device: ", torch.cuda.current_device())
+device_map = {"": torch.cuda.current_device()}
+#model = LlamaForCausalLM.from_pretrained(model_id)
+#device_ids = [0]  # 사용할 GPU 디바이스 ID 목록
+# device_map = {k: f"cuda:{device_ids[0]}" for k in model.state_dict().keys()}
+print("device_map : ", device_map)
 model = LlamaForCausalLM.from_pretrained(model_id, load_in_8bit=True, device_map=device_map, torch_dtype=torch.float16)
-
+# 데이터 병렬화
+# ValueError: `.to` is not supported for `4-bit` or `8-bit` bitsandbytes models. Please use the model as it is, since the model has already been set to the correct devices and casted to the correct `dtype`.
+# model = torch.nn.DataParallel(model, device_ids=device_ids)
 
 # In[7]:
 
@@ -187,8 +225,8 @@ def create_peft_config(model):
     )
 
     # prepare int-8 model for training
-    model = prepare_model_for_int8_training(model)
-    # model = prepare_model_for_kbit_training(model)
+    # model = prepare_model_for_int8_training(model)
+    model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
     return model, peft_config
