@@ -1,0 +1,105 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "sts:AssumeRole",
+			"Resource": "arn:aws:iam::106473235975:role/aladin_cross_account_role-9022ae9"
+		},
+		{
+			"Effect": "Allow",
+			"Action": "s3:*",
+			"Resource": [
+				"arn:aws:s3:::bucket-mlops-dev-kubeflow",
+				"arn:aws:s3:::bucket-mlops-dev-kubeflow/*",
+				"arn:aws:s3:::kf-artifact-store-*",
+				"arn:aws:s3:::kf-artifact-store-*/*",
+				"arn:aws:s3:::aladin-dev-redshift",
+				"arn:aws:s3:::aladin-dev-redshift/*",
+				"arn:aws:s3:::aladin-dev-feast",
+				"arn:aws:s3:::aladin-dev-feast/*"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": "secretsmanager:GetSecretValue",
+			"Resource": [
+				"arn:aws:secretsmanager:ap-northeast-2:671147868155:secret:dev/aladin/*",
+				"arn:aws:secretsmanager:ap-northeast-2:671147868155:secret:redshift!feast-namespace-aladin-*"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": [
+				"s3:PutObject",
+				"s3:PutObjectAcl",
+				"s3:GetObject"
+			],
+			"Resource": [
+				"arn:aws:s3:::msp-model-registry-dev/*",
+				"arn:aws:s3:::lunar-loader-dev/*"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": [
+				"kms:GenerateDataKey",
+				"kms:Decrypt"
+			],
+			"Resource": [
+				"arn:aws:kms:ap-northeast-2:891689049562:key/41b96115-f2a2-4447-95b3-8fb6c267bf86"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": "redshift-data:*",
+			"Resource": [
+				"arn:aws:s3:::bucket-mlops-dev-kubeflow",
+				"arn:aws:s3:::bucket-mlops-dev-kubeflow/*",
+				"arn:aws:s3:::kf-artifact-store-*",
+				"arn:aws:s3:::kf-artifact-store-*/*",
+				"arn:aws:redshift-serverless:*:*:workgroup/33208fe1-6368-4091-b38f-c54e45d5a0e3"
+			]
+		},
+		{
+			"Sid": "GetDynamoDB",
+			"Effect": "Allow",
+			"Action": [
+				"dynamodb:CreateTable",
+				"dynamodb:DescribeTable",
+				"dynamodb:DeleteTable",
+				"dynamodb:BatchWriteItem",
+				"dynamodb:BatchGetItem"
+			],
+			"Resource": [
+				"arn:aws:dynamodb:ap-northeast-2:671147868155:table/*"
+			]
+		},
+		{
+			"Sid": "RedshiftData1",
+			"Effect": "Allow",
+			"Action": [
+				"redshift-data:DescribeStatement",
+				"redshift-data:GetStatementResult"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "GetCredentialsForServerless",
+			"Effect": "Allow",
+			"Action": "redshift-serverless:GetCredentials",
+			"Resource": "arn:aws:redshift-serverless:*:*:workgroup/*"
+		},
+		{
+			"Sid": "GetTag",
+			"Effect": "Allow",
+			"Action": [
+				"tag:GetResources",
+				"tag:GetTagKeys"
+			],
+			"Resource": [
+				"arn:aws:redshift-serverless:*:*:workgroup/33208fe1-6368-4091-b38f-c54e45d5a0e3"
+			]
+		}
+	]
+}

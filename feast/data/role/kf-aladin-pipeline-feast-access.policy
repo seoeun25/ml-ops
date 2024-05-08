@@ -1,0 +1,66 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "s3:*",
+			"Resource": [
+				"arn:aws:s3:::aladin-dev-redshift",
+				"arn:aws:s3:::aladin-dev-redshift/*",
+				"arn:aws:s3:::aladin-dev-feast",
+				"arn:aws:s3:::aladin-dev-feast/*"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": "redshift-data:*",
+			"Resource": [
+				"arn:aws:redshift:*:*:aladin-redshift-cluster",
+				"arn:aws:redshift:*:*:dbname:*/*",
+				"arn:aws:redshift:*:*:dbuser:*/aladin",
+				"arn:aws:redshift-serverless:*:*:workgroup/56627ba3-2cb5-485e-b981-58385fd2c62e"
+			]
+		},
+		{
+			"Sid": "Dynamodb0",
+			"Effect": "Allow",
+			"Action": [
+				"dynamodb:CreateTable",
+				"dynamodb:DescribeTable",
+				"dynamodb:DeleteTable",
+				"dynamodb:BatchWriteItem",
+				"dynamodb:BatchGetItem"
+			],
+			"Resource": [
+				"arn:aws:dynamodb:ap-northeast-2:671147868155:table/*"
+			]
+		},
+		{
+			"Sid": "RedshiftData1",
+			"Effect": "Allow",
+			"Action": [
+				"redshift-data:DescribeStatement",
+				"redshift-data:GetStatementResult"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "GetCredentialsForAPIUserIAMCredentials",
+			"Effect": "Allow",
+			"Action": [
+				"redshift:GetClusterCredentials",
+				"redshift:GetClusterCredentialsWithIAM"
+			],
+			"Resource": [
+				"arn:aws:redshift:*:*:dbname:*/*",
+				"arn:aws:redshift:*:*:dbuser:*/aladin"
+			]
+		},
+		{
+			"Sid": "GetCredentialsForServerless",
+			"Effect": "Allow",
+			"Action": "redshift-serverless:GetCredentials",
+			"Resource": "arn:aws:redshift-serverless:*:*:workgroup/*"
+		}
+	]
+}

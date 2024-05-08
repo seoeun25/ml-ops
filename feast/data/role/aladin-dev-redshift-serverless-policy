@@ -1,0 +1,136 @@
+{
+    "Statement": [
+        {
+            "Action": [
+                "sagemaker:*"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:sagemaker:*:*:model/*redshift*",
+                "arn:aws:sagemaker:*:*:training-job/*redshift*",
+                "arn:aws:sagemaker:*:*:automl-job/*redshift*",
+                "arn:aws:sagemaker:*:*:compilation-job/*redshift*",
+                "arn:aws:sagemaker:*:*:processing-job/*redshift*",
+                "arn:aws:sagemaker:*:*:transform-job/*redshift*",
+                "arn:aws:sagemaker:*:*:endpoint/*redshift*"
+            ],
+            "Sid": "SageMaker"
+        },
+        {
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:DescribeLogStreams",
+                "logs:PutLogEvents"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:logs:*:*:log-group:/aws/sagemaker/Endpoints/*redshift*",
+                "arn:aws:logs:*:*:log-group:/aws/sagemaker/ProcessingJobs/*redshift*",
+                "arn:aws:logs:*:*:log-group:/aws/sagemaker/TrainingJobs/*redshift*",
+                "arn:aws:logs:*:*:log-group:/aws/sagemaker/TransformJobs/*redshift*"
+            ]
+        },
+        {
+            "Action": [
+                "cloudwatch:PutMetricData"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "cloudwatch:namespace": [
+                        "SageMaker",
+                        "/aws/sagemaker/Endpoints",
+                        "/aws/sagemaker/ProcessingJobs",
+                        "/aws/sagemaker/TrainingJobs",
+                        "/aws/sagemaker/TransformJobs"
+                    ]
+                }
+            },
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:GetDownloadUrlForLayer"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": "s3:*",
+            "Effect": "Allow",
+            "Resource": "*",
+            "Sid": "S3"
+        },
+        {
+            "Action": [
+                "dynamodb:Scan",
+                "dynamodb:DescribeTable",
+                "dynamodb:Getitem"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:dynamodb:*:*:table/*"
+            ]
+        },
+        {
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Effect": "Allow",
+            "Resource": "arn:aws:lambda:*:*:function:*redshift*",
+            "Sid": "Lambda"
+        },
+        {
+            "Action": "glue:*",
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:glue:*:*:table/*redshift*/*",
+                "arn:aws:glue:*:*:catalog",
+                "arn:aws:glue:*:*:database/*redshift*"
+            ],
+            "Sid": "Glue"
+        },
+        {
+            "Action": [
+                "secretsmanager:GetResourcePolicy",
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:ListSecretVersionIds"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:secretsmanager:*:*:secret:*redshift*"
+            ]
+        },
+        {
+            "Action": [
+                "secretsmanager:GetRandomPassword",
+                "secretsmanager:ListSecrets"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "iam:PassedToService": [
+                        "redshift.amazonaws.com",
+                        "glue.amazonaws.com",
+                        "sagemaker.amazonaws.com",
+                        "athena.amazonaws.com"
+                    ]
+                }
+            },
+            "Effect": "Allow",
+            "Resource": "arn:aws:iam::*:role/*"
+        }
+    ],
+    "Version": "2012-10-17"
+}
